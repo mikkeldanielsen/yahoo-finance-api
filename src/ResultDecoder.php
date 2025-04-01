@@ -6,6 +6,7 @@ namespace Scheb\YahooFinanceApi;
 
 use Scheb\YahooFinanceApi\Exception\ApiException;
 use Scheb\YahooFinanceApi\Exception\InvalidValueException;
+use Scheb\YahooFinanceApi\Results\Chart;
 use Scheb\YahooFinanceApi\Results\DividendData;
 use Scheb\YahooFinanceApi\Results\HistoricalData;
 use Scheb\YahooFinanceApi\Results\Option;
@@ -215,6 +216,61 @@ class ResultDecoder
         }
 
         return $returnArray;
+    }
+
+    public function transformChartResult(string $responseBody): array
+    {
+        $decoded = json_decode($responseBody, true);
+
+        if ((!\is_array($decoded)) || (isset($decoded['chart']['error']))) {
+            throw new ApiException('Response is not a valid JSON', ApiException::INVALID_RESPONSE);
+        }
+
+        $result = $decoded['chart']['result'][0];
+
+        if (0 === \count($result['indicators']['quote'][0])) {
+            return [];
+        }
+
+        $entryCount = \count($result['indicators']['quote'][0]['open']);
+
+        $returnArray = [];
+        for ($i = 0; $i < $entryCount; ++$i) {
+            $returnArray['quotes'][] = $this->createChartData($result, $i);
+        }
+        $returnArray['meta'] = $this->createMetaData($result);
+
+        return $returnArray;
+    }
+
+    private function createChartData(array $json, int $index): Chart {
+        $dateStr = date('Y-m-d H:i:s', $json['timestamp'][$index]);
+        if ($dateStr) {
+            $date = $this->validateDate($dateStr);
+        } else {
+            throw new ApiException(\sprintf('Not a date in column "Date":%s', $json['timestamp'][$index]), ApiException::INVALID_VALUE);
+        }
+
+        foreach (['open', 'high', 'low', 'close', 'volume'] as $column) {
+            $columnValue = $json['indicators']['quote'][0][$column][$index];
+            if (!is_numeric($columnValue) && 'null' !== $columnValue && !\is_null($columnValue)) {
+                throw new ApiException(\sprintf('Not a number in column "%s": %s', $column, $column), ApiException::INVALID_VALUE);
+            }
+        }
+
+        $open = (float) $json['indicators']['quote'][0]['open'][$index];
+        $high = (float) $json['indicators']['quote'][0]['high'][$index];
+        $low = (float) $json['indicators']['quote'][0]['low'][$index];
+        $close = (float) $json['indicators']['quote'][0]['close'][$index];
+        $volume = (int) $json['indicators']['quote'][0]['volume'][$index];
+
+        return new Chart($date, $open, $high, $low, $close, $volume);
+    }
+
+    private function createMetaData(array $json): array {
+        $meta = $json['meta'];
+        unset($meta['tradingPeriods'], $meta['currentTradingPeriod']);
+        return $meta;
     }
 
     private function createHistoricalData(array $json, int $index): HistoricalData

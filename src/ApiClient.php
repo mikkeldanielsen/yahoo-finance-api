@@ -15,6 +15,9 @@ use Scheb\YahooFinanceApi\Results\SplitData;
 
 class ApiClient
 {
+    public const INTERVAL_1_MIN = '1m';
+    public const INTERVAL_5_MIN = '5m';
+    public const INTERVAL_1_HOUR = '60m';
     public const INTERVAL_1_DAY = '1d';
     public const INTERVAL_1_WEEK = '1wk';
     public const INTERVAL_1_MONTH = '1mo';
@@ -197,6 +200,29 @@ class ApiClient
         return $this->fetchQuotes($currencySymbols);
     }
 
+    public function getChart(string $symbol, string $interval, \DateTimeInterface $startDate, \DateTimeInterface $endDate): array
+    {
+        $this->validateIntervals($interval);
+        $this->validateDates($startDate, $endDate);
+
+        $responseBody = $this->getHistoricalDataResponseBodyJson($symbol, $interval, $startDate, $endDate, self::FILTER_HISTORICAL);
+
+        return $this->resultDecoder->transformChartResult($responseBody);
+    }
+
+    public function getQuoteSummary(string $symbol, array $modules): array
+    {
+        return $this->stockSummary($symbol);
+    }
+
+    private function getQuoteSummaryDataResponseBodyJson(string $symbol, array $modules): string
+    {
+        $qs = $this->getRandomQueryServer();
+        $dataUrl = 'https://query'.$qs.'.finance.yahoo.com/v10/finance/quoteSummary/'.urlencode($symbol).'?modules='.implode(',', $modules);
+
+        return (string) $this->client->request('GET', $dataUrl, ['headers' => $this->getHeaders()])->getBody();
+    }
+
     private function getCookies(): CookieJar
     {
         $cookieJar = new CookieJar();
@@ -251,7 +277,7 @@ class ApiClient
 
     private function validateIntervals(string $interval): void
     {
-        $allowedIntervals = [self::INTERVAL_1_DAY, self::INTERVAL_1_WEEK, self::INTERVAL_1_MONTH];
+        $allowedIntervals = [self::INTERVAL_1_MIN, self::INTERVAL_5_MIN, self::INTERVAL_1_HOUR, self::INTERVAL_1_DAY, self::INTERVAL_1_WEEK, self::INTERVAL_1_MONTH];
         if (!\in_array($interval, $allowedIntervals)) {
             throw new \InvalidArgumentException(\sprintf('Interval must be one of: %s', implode(', ', $allowedIntervals)));
         }
@@ -280,8 +306,8 @@ class ApiClient
         $crumb = $this->getCrumb($qs, $cookieJar);
 
         // Fetch quotes
-        $modules = 'financialData,quoteType,defaultKeyStatistics,assetProfile,summaryDetail';
-        $url = 'https://query'.$qs.'.finance.yahoo.com/v10/finance/quoteSummary/'.$symbol.'?crumb='.$crumb.'&modules='.$modules;
+        $modules = 'financialData,Price,defaultKeyStatistics,assetProfile,summaryDetail';
+        $url = 'https://query'.$qs.'.finance.yahoo.com/v10/finance/quoteSummary/'.$symbol.'?crumb='.$crumb.'&modules='.$modules.'&lang=da-DK&region=DK';
         $responseBody = (string) $this->client->request('GET', $url, ['cookies' => $cookieJar, 'headers' => $this->getHeaders()])->getBody();
 
         return $this->resultDecoder->transformQuotesSummary($responseBody);
