@@ -171,15 +171,11 @@ class ResultDecoder
         $decoded = json_decode($responseBody, true);
 
         $missingFields = array_diff(self::RECOMMENDATION_BY_SYMBOLD_FIELDS, array_keys($decoded));
-        var_dump($missingFields);
-
-        var_dump($decoded['finance']['result']);
 
         if(!isset($decoded['finance']['result'][0]['recommendedSymbols'])) {
             throw new ApiException('Invalid or no recommendation', ApiException::INVALID_RESPONSE);
         }
-
-
+        
         $returnArray = [];
         foreach ($decoded['finance']['result'][0]['recommendedSymbols'] as $data) {
             $returnArray[] = new Recommendation(
