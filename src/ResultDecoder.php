@@ -13,6 +13,7 @@ use Scheb\YahooFinanceApi\Results\Option;
 use Scheb\YahooFinanceApi\Results\OptionChain;
 use Scheb\YahooFinanceApi\Results\OptionContract;
 use Scheb\YahooFinanceApi\Results\Quote;
+use Scheb\YahooFinanceApi\Results\Recommendation;
 use Scheb\YahooFinanceApi\Results\SearchResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
 
@@ -22,6 +23,7 @@ class ResultDecoder
     public const DIVIDEND_DATA_HEADER_LINE = ['Date', 'Dividends'];
     public const SPLIT_DATA_HEADER_LINE = ['Date', 'Stock Splits'];
     public const SEARCH_RESULT_FIELDS = ['symbol', 'shortname', 'exchange', 'quoteType', 'exchDisp', 'typeDisp'];
+    public const RECOMMENDATION_BY_SYMBOLD_FIELDS = ['symbol', 'score'];
     public const OPTION_CHAIN_FIELDS_MAP = [
         'underlyingSymbol' => ValueMapperInterface::TYPE_STRING,
         'expirationDates' => ValueMapperInterface::TYPE_ARRAY,
@@ -162,6 +164,31 @@ class ResultDecoder
             $json['exchDisp'],
             $json['typeDisp']
         );
+    }
+
+    public function transformRecommendationBySymbol(string $responseBody): array
+    {
+        $decoded = json_decode($responseBody, true);
+
+        $missingFields = array_diff(self::RECOMMENDATION_BY_SYMBOLD_FIELDS, array_keys($decoded));
+        var_dump($missingFields);
+
+        var_dump($decoded['finance']['result']);
+
+        if(!isset($decoded['finance']['result'][0]['recommendedSymbols'])) {
+            throw new ApiException('Invalid or no recommendation', ApiException::INVALID_RESPONSE);
+        }
+
+
+        $returnArray = [];
+        foreach ($decoded['finance']['result'][0]['recommendedSymbols'] as $data) {
+            $returnArray[] = new Recommendation(
+                $data['symbol'],
+                $data['score']
+            );
+        }
+
+        return $returnArray;
     }
 
     public function extractCrumb(string $responseBody): string

@@ -13,19 +13,19 @@ use Scheb\YahooFinanceApi\Results\Quote;
 use Scheb\YahooFinanceApi\Results\SearchResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
 
-class ApiClient
-{
-    public const INTERVAL_1_MIN = '1m';
-    public const INTERVAL_5_MIN = '5m';
-    public const INTERVAL_1_HOUR = '60m';
-    public const INTERVAL_1_DAY = '1d';
-    public const INTERVAL_1_WEEK = '1wk';
-    public const INTERVAL_1_MONTH = '1mo';
+class ApiClient {
+
+    public const INTERVAL_1_MIN         = '1m';
+    public const INTERVAL_5_MIN         = '5m';
+    public const INTERVAL_1_HOUR        = '60m';
+    public const INTERVAL_1_DAY         = '1d';
+    public const INTERVAL_1_WEEK        = '1wk';
+    public const INTERVAL_1_MONTH       = '1mo';
     public const CURRENCY_SYMBOL_SUFFIX = '=X';
 
     private const FILTER_HISTORICAL = 'history';
-    private const FILTER_DIVIDENDS = 'div';
-    private const FILTER_SPLITS = 'split';
+    private const FILTER_DIVIDENDS  = 'div';
+    private const FILTER_SPLITS     = 'split';
 
     /**
      * @var ClientInterface
@@ -42,15 +42,15 @@ class ApiClient
      */
     private $userAgent;
 
-    public function __construct(ClientInterface $guzzleClient, ResultDecoder $resultDecoder)
-    {
-        $this->client = $guzzleClient;
+    public function __construct( ClientInterface $guzzleClient, ResultDecoder $resultDecoder ) {
+
+        $this->client        = $guzzleClient;
         $this->resultDecoder = $resultDecoder;
-        $this->userAgent = UserAgent::getRandomUserAgent();
+        $this->userAgent     = UserAgent::getRandomUserAgent();
     }
 
-    public function getHeaders(): array
-    {
+    public function getHeaders(): array {
+
         return [
             'User-Agent' => $this->userAgent,
         ];
@@ -63,18 +63,27 @@ class ApiClient
      *
      * @throws ApiException
      */
-    public function search(string $searchTerm, string $locale = 'en-US', int $limit = 10): array
+    public function search( string $searchTerm, string $locale = 'en-US', int $limit = 10 ): array {
+
+        $qs  = $this->getRandomQueryServer();
+        $url = 'https://query' . $qs . '.finance.yahoo.com/v1/finance/search?'
+            . 'q=' . urlencode( $searchTerm )
+            . '&lang=' . urlencode( $locale )
+            . '&region=US&quotesCount=' . $limit
+            . '&quotesQueryId=tss_match_phrase_query&multiQuoteQueryId=multi_quote_single_token_query&enableCb=false&enableNavLinks=true&enableCulturalAssets=true&enableNews=false&enableResearchReports=false&enableLists=false&listsCount=0&recommendCount=0&enablePrivateCompany=true';
+
+        $responseBody = (string)$this->client->request( 'GET', $url, [ 'headers' => $this->getHeaders() ] )->getBody();
+
+        return $this->resultDecoder->transformSearchResult( $responseBody );
+    }
+
+    public function recommendationsBySymbol( string $symbol )
     {
-        $qs = $this->getRandomQueryServer();
-        $url = 'https://query'.$qs.'.finance.yahoo.com/v1/finance/search?'
-            .'q='.urlencode($searchTerm)
-            .'&lang='.urlencode($locale)
-            .'&region=US&quotesCount='.$limit
-            .'&quotesQueryId=tss_match_phrase_query&multiQuoteQueryId=multi_quote_single_token_query&enableCb=false&enableNavLinks=true&enableCulturalAssets=true&enableNews=false&enableResearchReports=false&enableLists=false&listsCount=0&recommendCount=0&enablePrivateCompany=true';
+        $qs  = $this->getRandomQueryServer();
+        $url = 'https://query' . $qs . '.finance.yahoo.com/v6/finance/recommendationsbysymbol/' . urlencode( $symbol );
 
-        $responseBody = (string) $this->client->request('GET', $url, ['headers' => $this->getHeaders()])->getBody();
-
-        return $this->resultDecoder->transformSearchResult($responseBody);
+        $responseBody = (string)$this->client->request( 'GET', $url, [ 'headers' => $this->getHeaders() ] )->getBody();
+        return $this->resultDecoder->transformRecommendationBySymbol( $responseBody );
     }
 
     /**
