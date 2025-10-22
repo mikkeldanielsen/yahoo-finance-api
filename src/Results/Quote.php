@@ -4,78 +4,83 @@ declare(strict_types=1);
 
 namespace Scheb\YahooFinanceApi\Results;
 
+/**
+ * @final
+ *
+ * @psalm-suppress PropertyNotSetInConstructor
+ */
 class Quote implements \JsonSerializable
 {
-    private $ask;
-    private $askSize;
-    private $averageDailyVolume10Day;
-    private $averageDailyVolume3Month;
-    private $bid;
-    private $bidSize;
-    private $bookValue;
-    private $currency;
-    private $dividendDate;
-    private $earningsTimestamp;
-    private $earningsTimestampStart;
-    private $earningsTimestampEnd;
-    private $epsForward;
-    private $epsTrailingTwelveMonths;
-    private $exchange;
-    private $exchangeDataDelayedBy;
-    private $exchangeTimezoneName;
-    private $exchangeTimezoneShortName;
-    private $fiftyDayAverage;
-    private $fiftyDayAverageChange;
-    private $fiftyDayAverageChangePercent;
-    private $fiftyTwoWeekHigh;
-    private $fiftyTwoWeekHighChange;
-    private $fiftyTwoWeekHighChangePercent;
-    private $fiftyTwoWeekLow;
-    private $fiftyTwoWeekLowChange;
-    private $fiftyTwoWeekLowChangePercent;
-    private $financialCurrency;
-    private $forwardPE;
-    private $fullExchangeName;
-    private $gmtOffSetMilliseconds;
-    private $language;
-    private $longName;
-    private $market;
-    private $marketCap;
-    private $marketState;
-    private $messageBoardId;
-    private $postMarketChange;
-    private $postMarketChangePercent;
-    private $postMarketPrice;
-    private $postMarketTime;
-    private $preMarketChange;
-    private $preMarketChangePercent;
-    private $preMarketPrice;
-    private $preMarketTime;
-    private $priceHint;
-    private $priceToBook;
-    private $openInterest;
-    private $quoteSourceName;
-    private $quoteType;
-    private $regularMarketChange;
-    private $regularMarketChangePercent;
-    private $regularMarketDayHigh;
-    private $regularMarketDayLow;
-    private $regularMarketOpen;
-    private $regularMarketPreviousClose;
-    private $regularMarketPrice;
-    private $regularMarketTime;
-    private $regularMarketVolume;
-    private $sharesOutstanding;
-    private $shortName;
-    private $sourceInterval;
-    private $symbol;
-    private $tradeable;
-    private $trailingAnnualDividendRate;
-    private $trailingAnnualDividendYield;
-    private $trailingPE;
-    private $twoHundredDayAverage;
-    private $twoHundredDayAverageChange;
-    private $twoHundredDayAverageChangePercent;
+    private ?float $ask = null;
+    private ?int $askSize = null;
+    private ?int $averageDailyVolume10Day = null;
+    private ?int $averageDailyVolume3Month = null;
+    private ?float $bid = null;
+    private ?int $bidSize = null;
+    private ?float $bookValue = null;
+    private ?string $currency = null;
+    private ?\DateTimeInterface $dividendDate = null;
+    private ?\DateTimeInterface $earningsTimestamp = null;
+    private ?\DateTimeInterface $earningsTimestampStart = null;
+    private ?\DateTimeInterface $earningsTimestampEnd = null;
+    private ?float $epsForward = null;
+    private ?float $epsTrailingTwelveMonths = null;
+    private ?string $exchange = null;
+    private ?int $exchangeDataDelayedBy = null;
+    private ?string $exchangeTimezoneName = null;
+    private ?string $exchangeTimezoneShortName = null;
+    private ?float $fiftyDayAverage = null;
+    private ?float $fiftyDayAverageChange = null;
+    private ?float $fiftyDayAverageChangePercent = null;
+    private ?float $fiftyTwoWeekHigh = null;
+    private ?float $fiftyTwoWeekHighChange = null;
+    private ?float $fiftyTwoWeekHighChangePercent = null;
+    private ?float $fiftyTwoWeekLow = null;
+    private ?float $fiftyTwoWeekLowChange = null;
+    private ?float $fiftyTwoWeekLowChangePercent = null;
+    private ?string $financialCurrency = null;
+    private ?float $forwardPE = null;
+    private ?string $fullExchangeName = null;
+    private ?int $gmtOffSetMilliseconds = null;
+    private ?string $language = null;
+    private ?string $longName = null;
+    private ?string $market = null;
+    private ?int $marketCap = null;
+    private ?string $marketState = null;
+    private ?string $messageBoardId = null;
+    private ?float $postMarketChange = null;
+    private ?float $postMarketChangePercent = null;
+    private ?float $postMarketPrice = null;
+    private ?\DateTimeInterface $postMarketTime = null;
+    private ?float $preMarketChange = null;
+    private ?float $preMarketChangePercent = null;
+    private ?float $preMarketPrice = null;
+    private ?\DateTimeInterface $preMarketTime = null;
+    private ?int $priceHint = null;
+    private ?float $priceToBook = null;
+    private ?float $openInterest = null;
+    private ?string $quoteSourceName = null;
+    private ?string $quoteType = null;
+    private ?float $regularMarketChange = null;
+    private ?float $regularMarketChangePercent = null;
+    private ?float $regularMarketDayHigh = null;
+    private ?float $regularMarketDayLow = null;
+    private ?float $regularMarketOpen = null;
+    private ?float $regularMarketPreviousClose = null;
+    private ?float $regularMarketPrice = null;
+    private ?\DateTimeInterface $regularMarketTime = null;
+    private ?int $regularMarketVolume = null;
+    private ?int $sharesOutstanding = null;
+    private ?string $shortName = null;
+    private ?int $sourceInterval = null;
+    private ?string $symbol = null;
+    private ?bool $tradeable = null;
+    private ?float $trailingAnnualDividendRate = null;
+    private ?float $trailingAnnualDividendYield = null;
+    private ?float $trailingPE = null;
+    private ?float $twoHundredDayAverage = null;
+    private ?float $twoHundredDayAverageChange = null;
+    private ?float $twoHundredDayAverageChangePercent = null;
 
     public function __construct(array $values)
     {
@@ -86,7 +91,10 @@ class Quote implements \JsonSerializable
 
     public function jsonSerialize(): array
     {
-        return get_object_vars($this);
+        return array_merge(
+            get_class_vars(self::class),
+            get_object_vars($this)
+        );
     }
 
     public function getAsk(): ?float

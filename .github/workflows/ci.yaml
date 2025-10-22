@@ -17,6 +17,7 @@ jobs:
             fail-fast: false
             matrix:
                 php-version:
+                    # php-cs-fixer: PHP needs to be a minimum version of PHP 7.4.0 and maximum version of PHP 8.3.*.
                     - '8.3'
 
         steps:
@@ -49,13 +50,13 @@ jobs:
 
             -   name: "PHP Code Style Sniffer"
                 if: always()
-                run: vendor/bin/phpcs --standard=php_cs.xml src tests
+                run: vendor/bin/phpcs
 
             -   name: "Psalm"
                 if: always()
                 run: vendor/bin/psalm
 
-    tests:
+    unit-tests:
         name: "Unit Tests - PHP ${{ matrix.php-version }}${{ matrix.dependency-versions && format(', Deps: {0}', matrix.dependency-versions) }}"
         runs-on: ubuntu-latest
         # We want to run on external PRs, but not on our own internal PRs as they'll be run by the push to the branch.
@@ -65,9 +66,8 @@ jobs:
             fail-fast: false
             matrix:
                 include:
-                    -   php-version: '7.1.3'
+                    -   php-version: '8.1'
                         dependency-versions: 'lowest'  # Lowest possible configuration
-                    -   php-version: '7.4'  # Highest possible 7 version
                     -   php-version: '8.4'  # Highest possible 8 version
 
         steps:
@@ -96,7 +96,53 @@ jobs:
                 run: composer show
 
             -   name: 'Run tests'
-                run: vendor/bin/phpunit
+                run: vendor/bin/phpunit --testsuite=unit
+
+    integration-tests:
+        name: "Integration Tests - PHP ${{ matrix.php-version }}"
+        runs-on: ubuntu-latest
+        # We want to run on external PRs, but not on our own internal PRs as they'll be run by the push to the branch.
+        if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
+
+        strategy:
+            fail-fast: false
+            matrix:
+                php-version:
+                    - '8.4'
+
+        steps:
+            -   name: 'Checkout code'
+                uses: actions/checkout@v2
+
+            -   name: 'Setup PHP'
+                uses: shivammathur/setup-php@v2
+                with:
+                    coverage: 'none'
+                    extensions: 'json'
+                    php-version: '${{ matrix.php-version }}'
+
+            -   name: 'Setup curl-impersonate'
+                run: bin/setup-curl-impersonate.sh
+
+            -   name: 'Display PHP versions'
+                run: |
+                    php -r 'foreach (get_loaded_extensions() as $extension) echo $extension . " " . phpversion($extension) . PHP_EOL;'
+                    php -i
+
+            -   name: 'Install Composer dependencies'
+                uses: ramsey/composer-install@v1
+                with:
+                    composer-options: '--prefer-dist'
+                    dependency-versions: '${{ matrix.dependency-versions }}'
+
+            -   name: 'Display dependencies versions'
+                run: composer show
+
+            -   name: 'Run tests'
+                run: vendor/bin/phpunit --testsuite=integration
+                env:
+                    LD_PRELOAD: /home/runner/curl-impersonate/libcurl-impersonate.so
+                    CURL_IMPERSONATE: chrome136
 
     code-coverage:
         name: 'Code Coverage - PHP ${{ matrix.php-version }}'
@@ -121,6 +167,9 @@ jobs:
                     extensions: 'json'
                     php-version: '${{ matrix.php-version }}'
 
+            -   name: 'Setup curl-impersonate'
+                run: bin/setup-curl-impersonate.sh
+
             -   name: 'Display PHP versions'
                 run: |
                     php -r 'foreach (get_loaded_extensions() as $extension) echo $extension . " " . phpversion($extension) . PHP_EOL;'
@@ -136,6 +185,9 @@ jobs:
 
             -   name: 'Run tests with coverage'
                 run: vendor/bin/phpunit --coverage-clover coverage/clover.xml
+                env:
+                    LD_PRELOAD: /home/runner/curl-impersonate/libcurl-impersonate.so
+                    CURL_IMPERSONATE: chrome136
 
             -   name: 'Send Coverage to Codecov'
                 uses: codecov/codecov-action@v3

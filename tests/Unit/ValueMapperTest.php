@@ -2,39 +2,34 @@
 
 declare(strict_types=1);
 
-namespace Scheb\YahooFinanceApi\Tests;
+namespace Scheb\YahooFinanceApi\Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use Scheb\YahooFinanceApi\Exception\InvalidValueException;
+use Scheb\YahooFinanceApi\Tests\TestCase;
 use Scheb\YahooFinanceApi\ValueMapper;
 use Scheb\YahooFinanceApi\ValueMapperInterface;
 
 class ValueMapperTest extends TestCase
 {
-    /**
-     * @var ValueMapper
-     */
-    private $valueMapper;
+    private ValueMapper $valueMapper;
 
     protected function setUp(): void
     {
         $this->valueMapper = new ValueMapper();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function mapValue_invalidType_throwInvalidArgumentException(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->valueMapper->mapValue('invalid', 'value');
     }
 
-    /**
-     * @test
-     * @dataProvider provideValidValues
-     */
-    public function mapValue_passValidValue_returnMappedValue(string $type, $inputValue, $expectedOutput): void
+    #[Test]
+    #[DataProvider('provideValidValues')]
+    public function mapValue_passValidValue_returnMappedValue(string $type, string|float|int $inputValue, float|int|string|\DateTime|bool $expectedOutput): void
     {
         $returnValue = $this->valueMapper->mapValue($inputValue, $type);
         if (\is_object($expectedOutput)) {
@@ -44,7 +39,7 @@ class ValueMapperTest extends TestCase
         }
     }
 
-    public function provideValidValues(): array
+    public static function provideValidValues(): array
     {
         return [
             [ValueMapperInterface::TYPE_FLOAT, '1.123', 1.123],
@@ -59,17 +54,15 @@ class ValueMapperTest extends TestCase
         ];
     }
 
-    /**
-     * @test
-     * @dataProvider provideTypes
-     */
+    #[Test]
+    #[DataProvider('provideTypes')]
     public function mapValue_nullPassed_returnsNUll(string $type): void
     {
         $returnValue = $this->valueMapper->mapValue(null, $type);
         $this->assertNull($returnValue);
     }
 
-    public function provideTypes(): array
+    public static function provideTypes(): array
     {
         return [
             [ValueMapperInterface::TYPE_FLOAT],
@@ -80,17 +73,15 @@ class ValueMapperTest extends TestCase
         ];
     }
 
-    /**
-     * @test
-     * @dataProvider provideInvalidValues
-     */
-    public function mapValue_passInvalidValue_throwInvalidValueException(string $type, $inputValue): void
+    #[Test]
+    #[DataProvider('provideInvalidValues')]
+    public function mapValue_passInvalidValue_throwInvalidValueException(string $type, string $inputValue): void
     {
         $this->expectException(InvalidValueException::class);
         $this->valueMapper->mapValue($inputValue, $type);
     }
 
-    public function provideInvalidValues(): array
+    public static function provideInvalidValues(): array
     {
         return [
             [ValueMapperInterface::TYPE_FLOAT, ''],

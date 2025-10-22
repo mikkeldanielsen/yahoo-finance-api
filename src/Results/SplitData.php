@@ -4,20 +4,23 @@ declare(strict_types=1);
 
 namespace Scheb\YahooFinanceApi\Results;
 
+/**
+ * @final
+ */
 class SplitData implements \JsonSerializable
 {
-    private $date;
-    private $stockSplits;
-
-    public function __construct(\DateTime $date, ?string $stockSplits)
-    {
-        $this->date = $date;
-        $this->stockSplits = $stockSplits;
+    public function __construct(
+        private readonly \DateTime $date,
+        private readonly ?string $stockSplits,
+    ) {
     }
 
     public function jsonSerialize(): array
     {
-        return get_object_vars($this);
+        return array_merge(
+            get_class_vars(self::class),
+            get_object_vars($this)
+        );
     }
 
     public function getDate(): \DateTimeInterface

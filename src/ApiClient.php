@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Scheb\YahooFinanceApi;
 
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Cookie\CookieJar;
+use GuzzleHttp\Exception\GuzzleException;
+use Scheb\YahooFinanceApi\Context\ContextManagerInterface;
 use Scheb\YahooFinanceApi\Exception\ApiException;
 use Scheb\YahooFinanceApi\Results\DividendData;
 use Scheb\YahooFinanceApi\Results\HistoricalData;
@@ -13,6 +13,9 @@ use Scheb\YahooFinanceApi\Results\Quote;
 use Scheb\YahooFinanceApi\Results\SearchResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
 
+/**
+ * @final
+ */
 class ApiClient {
 
     public const INTERVAL_1_MIN         = '1m';
@@ -22,38 +25,14 @@ class ApiClient {
     public const INTERVAL_1_WEEK        = '1wk';
     public const INTERVAL_1_MONTH       = '1mo';
     public const CURRENCY_SYMBOL_SUFFIX = '=X';
-
     private const FILTER_HISTORICAL = 'history';
     private const FILTER_DIVIDENDS  = 'div';
     private const FILTER_SPLITS     = 'split';
 
-    /**
-     * @var ClientInterface
-     */
-    private $client;
-
-    /**
-     * @var ResultDecoder
-     */
-    private $resultDecoder;
-
-    /**
-     * @var string
-     */
-    private $userAgent;
-
-    public function __construct( ClientInterface $guzzleClient, ResultDecoder $resultDecoder ) {
-
-        $this->client        = $guzzleClient;
-        $this->resultDecoder = $resultDecoder;
-        $this->userAgent     = UserAgent::getRandomUserAgent();
-    }
-
-    public function getHeaders(): array {
-
-        return [
-            'User-Agent' => $this->userAgent,
-        ];
+    public function __construct(
+        private readonly ContextManagerInterface $contextManager,
+        private readonly ResultDecoder $resultDecoder,
+    ) {
     }
 
     /**
@@ -61,20 +40,19 @@ class ApiClient {
      *
      * @return SearchResult[]
      *
-     * @throws ApiException
+     * @throws GuzzleException|ApiException
      */
     public function search( string $searchTerm, string $locale = 'en-US', int $limit = 10 ): array {
 
-        $qs  = $this->getRandomQueryServer();
-        $url = 'https://query' . $qs . '.finance.yahoo.com/v1/finance/search?'
+        $url = 'https://query{queryServer}.finance.yahoo.com/v1/finance/search?'
             . 'q=' . urlencode( $searchTerm )
             . '&lang=' . urlencode( $locale )
             . '&region=US&quotesCount=' . $limit
             . '&quotesQueryId=tss_match_phrase_query&multiQuoteQueryId=multi_quote_single_token_query&enableCb=false&enableNavLinks=true&enableCulturalAssets=true&enableNews=false&enableResearchReports=false&enableLists=false&listsCount=0&recommendCount=0&enablePrivateCompany=true';
 
-        $responseBody = (string)$this->client->request( 'GET', $url, [ 'headers' => $this->getHeaders() ] )->getBody();
+        $response =$this->contextManager->request( 'GET', $url);
 
-        return $this->resultDecoder->transformSearchResult( $responseBody );
+        return $this->resultDecoder->transformSearchResult((string) $response->getBody());
     }
 
     public function recommendationsBySymbol( string $symbol )
@@ -87,34 +65,18 @@ class ApiClient {
     }
 
     /**
-     * Get historical data for a symbol (deprecated).
-     *
-     * @deprecated In future versions, this function will be removed. Please consider using getHistoricalQuoteData() instead.
-     *
-     * @return HistoricalData[]
-     *
-     * @throws ApiException
-     */
-    public function getHistoricalData(string $symbol, string $interval, \DateTimeInterface $startDate, \DateTimeInterface $endDate): array
-    {
-        @trigger_error('[scheb/yahoo-finance-api] getHistoricalData() is deprecated and will be removed in a future release', \E_USER_DEPRECATED);
-
-        return $this->getHistoricalQuoteData($symbol, $interval, $startDate, $endDate);
-    }
-
-    /**
      * Get historical data for a symbol.
      *
      * @return HistoricalData[]
      *
-     * @throws ApiException
+     * @throws GuzzleException|ApiException|\InvalidArgumentException
      */
     public function getHistoricalQuoteData(string $symbol, string $interval, \DateTimeInterface $startDate, \DateTimeInterface $endDate): array
     {
         $this->validateIntervals($interval);
         $this->validateDates($startDate, $endDate);
 
-        $responseBody = $this->getHistoricalDataResponseBodyJson($symbol, $interval, $startDate, $endDate, self::FILTER_HISTORICAL);
+        $responseBody = $this->getHistoricalDataResponse($symbol, $interval, $startDate, $endDate, self::FILTER_HISTORICAL);
 
         return $this->resultDecoder->transformHistoricalDataResult($responseBody);
     }
@@ -124,19 +86,18 @@ class ApiClient {
      *
      * @return DividendData[]
      *
-     * @throws ApiException
+     * @throws GuzzleException|ApiException|\InvalidArgumentException
      */
     public function getHistoricalDividendData(string $symbol, \DateTimeInterface $startDate, \DateTimeInterface $endDate): array
     {
         $this->validateDates($startDate, $endDate);
 
-        $responseBody = $this->getHistoricalDataResponseBodyJson($symbol, self::INTERVAL_1_MONTH, $startDate, $endDate, self::FILTER_DIVIDENDS);
+        $responseBody = $this->getHistoricalDataResponse($symbol, self::INTERVAL_1_MONTH, $startDate, $endDate, self::FILTER_DIVIDENDS);
 
         $historicData = $this->resultDecoder->transformDividendDataResult($responseBody);
-        usort($historicData, function (DividendData $a, DividendData $b): int {
+        usort($historicData, fn (DividendData $a, DividendData $b): int =>
             // Data is not necessary in order, so ensure ascending order by date
-            return $a->getDate() <=> $b->getDate();
-        });
+            $a->getDate() <=> $b->getDate());
 
         return $historicData;
     }
@@ -146,37 +107,40 @@ class ApiClient {
      *
      * @return SplitData[]
      *
-     * @throws ApiException
+     * @throws GuzzleException|ApiException
      */
     public function getHistoricalSplitData(string $symbol, \DateTimeInterface $startDate, \DateTimeInterface $endDate): array
     {
         $this->validateDates($startDate, $endDate);
 
-        $responseBody = $this->getHistoricalDataResponseBodyJson($symbol, self::INTERVAL_1_MONTH, $startDate, $endDate, self::FILTER_SPLITS);
+        $responseBody = $this->getHistoricalDataResponse($symbol, self::INTERVAL_1_MONTH, $startDate, $endDate, self::FILTER_SPLITS);
 
         $historicData = $this->resultDecoder->transformSplitDataResult($responseBody);
-        usort($historicData, function (SplitData $a, SplitData $b): int {
+        usort($historicData, fn (SplitData $a, SplitData $b): int =>
             // Data is not necessary in order, so ensure ascending order by date
-            return $a->getDate() <=> $b->getDate();
-        });
+            $a->getDate() <=> $b->getDate());
 
         return $historicData;
     }
 
     /**
      * Get quote for a single symbol.
+     *
+     * @throws GuzzleException|ApiException
      */
     public function getQuote(string $symbol): ?Quote
     {
         $list = $this->fetchQuotes([$symbol]);
 
-        return isset($list[0]) ? $list[0] : null;
+        return $list[0] ?? null;
     }
 
     /**
      * Get quotes for one or multiple symbols.
      *
      * @return Quote[]
+     *
+     * @throws GuzzleException|ApiException
      */
     public function getQuotes(array $symbols): array
     {
@@ -185,12 +149,14 @@ class ApiClient {
 
     /**
      * Get exchange rate for two currencies. Accepts concatenated ISO 4217 currency codes such as "GBP" or "USD".
+     *
+     * @throws GuzzleException|ApiException
      */
     public function getExchangeRate(string $currency1, string $currency2): ?Quote
     {
         $list = $this->getExchangeRates([[$currency1, $currency2]]);
 
-        return isset($list[0]) ? $list[0] : null;
+        return $list[0] ?? null;
     }
 
     /**
@@ -199,11 +165,13 @@ class ApiClient {
      * @param string[][] $currencyPairs List of pairs of currencies, e.g. [["USD", "GBP"]]
      *
      * @return Quote[]
+     *
+     * @throws GuzzleException|ApiException
      */
     public function getExchangeRates(array $currencyPairs): array
     {
-        $currencySymbols = array_map(function (array $currencies) {
-            return implode($currencies).self::CURRENCY_SYMBOL_SUFFIX; // Currency pairs are suffixed with "=X"
+        $currencySymbols = array_map(function (array $currencies): string {
+            return implode('', $currencies).self::CURRENCY_SYMBOL_SUFFIX; // Currency pairs are suffixed with "=X"
         }, $currencyPairs);
 
         return $this->fetchQuotes($currencySymbols);
@@ -258,32 +226,32 @@ class ApiClient {
      * Fetch quote data from API.
      *
      * @return Quote[]
+     *
+     * @throws GuzzleException|ApiException
      */
-    private function fetchQuotes(array $symbols)
+    private function fetchQuotes(array $symbols): array
     {
-        $qs = $this->getRandomQueryServer();
-
-        // Initialize session cookies
-        $cookieJar = $this->getCookies();
-
-        // Get crumb value
-        $crumb = $this->getCrumb($qs, $cookieJar);
-
         // Fetch quotes
-        $url = 'https://query'.$qs.'.finance.yahoo.com/v7/finance/quote?crumb='.$crumb.'&symbols='.urlencode(implode(',', $symbols));
-        $responseBody = (string) $this->client->request('GET', $url, ['cookies' => $cookieJar, 'headers' => $this->getHeaders()])->getBody();
+        $url = 'https://query{queryServer}.finance.yahoo.com/v7/finance/quote?crumb={crumb}&symbols='.urlencode(implode(',', $symbols));
+        $responseBody = (string) $this->contextManager->request('GET', $url)->getBody();
 
         return $this->resultDecoder->transformQuotes($responseBody);
     }
 
-    private function getHistoricalDataResponseBodyJson(string $symbol, string $interval, \DateTimeInterface $startDate, \DateTimeInterface $endDate, string $filter): string
+    /**
+     * @throws GuzzleException
+     */
+    private function getHistoricalDataResponse(string $symbol, string $interval, \DateTimeInterface $startDate, \DateTimeInterface $endDate, string $filter): string
     {
-        $qs = $this->getRandomQueryServer();
-        $dataUrl = 'https://query'.$qs.'.finance.yahoo.com/v8/finance/chart/'.urlencode($symbol).'?period1='.$startDate->getTimestamp().'&period2='.$endDate->getTimestamp().'&interval='.$interval.'&events='.$filter;
+        $url = 'https://query{queryServer}.finance.yahoo.com/v8/finance/chart/'.urlencode($symbol).'?period1='.$startDate->getTimestamp().'&period2='.$endDate->getTimestamp().'&interval='.$interval.'&events='.$filter;
+        $response = $this->contextManager->request('GET', $url);
 
-        return (string) $this->client->request('GET', $dataUrl, ['headers' => $this->getHeaders()])->getBody();
+        return (string) $response->getBody();
     }
 
+    /**
+     * @throws \InvalidArgumentException
+     */
     private function validateIntervals(string $interval): void
     {
         $allowedIntervals = [self::INTERVAL_1_MIN, self::INTERVAL_5_MIN, self::INTERVAL_1_HOUR, self::INTERVAL_1_DAY, self::INTERVAL_1_WEEK, self::INTERVAL_1_MONTH];
@@ -292,6 +260,9 @@ class ApiClient {
         }
     }
 
+    /**
+     * @throws \InvalidArgumentException
+     */
     private function validateDates(\DateTimeInterface $startDate, \DateTimeInterface $endDate): void
     {
         if ($startDate > $endDate) {
@@ -299,46 +270,51 @@ class ApiClient {
         }
     }
 
-    private function getRandomQueryServer(): int
+    /**
+     * @param array $modules List of modules to be fetched.
+     *
+     * Known modules:
+     *   summaryDetail,
+     *   quoteType,
+     *   assetProfile,
+     *   defaultKeyStatistics,
+     *   financialData,
+     *   recommendationTrend,
+     *   upgradeDowngradeHistory,
+     *   majorHoldersBreakdown,
+     *   insiderHolders,
+     *   netSharePurchaseActivity,
+     *   earnings,
+     *   earningsHistory,
+     *   earningsTrend,
+     *   industryTrend,
+     *   indexTrend,
+     *   sectorTrend
+     *
+     * @throws GuzzleException|ApiException
+     */
+    public function getStockSummary(string $symbol, array $modules = []): array
     {
-        return rand(1, 2);
-    }
-
-    public function stockSummary(string $symbol): array
-    {
-        $qs = $this->getRandomQueryServer();
-
-        // Initialize session cookies
-        $cookieJar = $this->getCookies();
-
-        // Get crumb value
-        $crumb = $this->getCrumb($qs, $cookieJar);
-
         // Fetch quotes
-        $modules = 'financialData,Price,defaultKeyStatistics,assetProfile,summaryDetail';
-        $url = 'https://query'.$qs.'.finance.yahoo.com/v10/finance/quoteSummary/'.$symbol.'?crumb='.$crumb.'&modules='.$modules.'&lang=da-DK&region=DK';
-        $responseBody = (string) $this->client->request('GET', $url, ['cookies' => $cookieJar, 'headers' => $this->getHeaders()])->getBody();
+        $url = 'https://query{queryServer}.finance.yahoo.com/v10/finance/quoteSummary/'.urlencode($symbol).'?crumb={crumb}&modules='.urlencode(implode(',', $modules));
 
-        return $this->resultDecoder->transformQuotesSummary($responseBody);
+        $response = $this->contextManager->request('GET', $url);
+
+        return $this->resultDecoder->transformQuotesSummary((string) $response->getBody());
     }
 
+    /**
+     * @throws GuzzleException|ApiException
+     */
     public function getOptionChain(string $symbol, ?\DateTimeInterface $expiryDate = null): array
     {
-        $qs = $this->getRandomQueryServer();
-
-        // Initialize session cookies
-        $cookieJar = $this->getCookies();
-
-        // Get crumb value
-        $crumb = $this->getCrumb($qs, $cookieJar);
-
         // Fetch options
-        $url = 'https://query'.$qs.'.finance.yahoo.com/v7/finance/options/'.$symbol.'?crumb='.$crumb;
-        if ($expiryDate) {
-            $url .= '&date='.(string) $expiryDate->getTimestamp();
+        $url = 'https://query{queryServer}.finance.yahoo.com/v7/finance/options/'.urlencode($symbol).'?crumb={crumb}';
+        if ($expiryDate instanceof \DateTimeInterface) {
+            $url .= '&date='.$expiryDate->getTimestamp();
         }
-        $responseBody = (string) $this->client->request('GET', $url, ['cookies' => $cookieJar, 'headers' => $this->getHeaders()])->getBody();
+        $response = $this->contextManager->request('GET', $url);
 
-        return $this->resultDecoder->transformOptionChains($responseBody);
+        return $this->resultDecoder->transformOptionChains((string) $response->getBody());
     }
 }

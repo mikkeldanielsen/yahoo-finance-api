@@ -1,6 +1,45 @@
 Upgrade
 =======
 
+## From 4.x to 5.x
+
+Minimum required PHP version is now 8.1.
+
+`stockSummary()` has been removed. Use `getStockSummary()` instead. The new method requires a list of modules to be
+fetched. See method description for a list of known modules. Feel free to explore what kind of data you can retrieve
+with that function. An example dataset for the Apple stock can be found in [stockSummaryExample.json](doc/stockSummaryExample.json).
+
+`getHistoricalData()` has been removed. Use `getHistoricalQuoteData()` instead.
+
+Instead of passing a Guzzle client to `ApiClientFactory`, now just pass the client `$options`. The Guzzle client
+instance will be automatically created with these options.
+
+Before:
+
+```php
+$guzzleClientOptions = [/* ... */];
+$guzzleClient = new Client($guzzleClientOptions);
+$client = ApiClientFactory::createApiClient($guzzleClient);
+```
+
+After:
+
+```php
+$guzzleClientOptions = [/* ... */];
+$client = ApiClientFactory::createApiClient($guzzleClientOptions);
+```
+
+The `UserAgent` class has been removed. Previously a random user agent from a hardcoded list was set. Now, if you want
+to set a user agent, pass it as a header in the client options.
+
+```php
+$guzzleClientOptions = ['headers' => ['User-Agent' => 'MyApp/1.0']];
+$client = ApiClientFactory::createApiClient($guzzleClientOptions);
+```
+
+When using [curl-impersonate](https://github.com/lexiforest/curl-impersonate), you no longer need to set the
+`User-Agent` as the library will automatically make sure the correct one is used.
+
 ## From 3.x to 4.x
 
 Minimum required PHP version is now 7.1.3.

@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Scheb\YahooFinanceApi\Results;
 
+/**
+ * @final
+ *
+ * @psalm-suppress PropertyNotSetInConstructor
+ */
 class OptionChain implements \JsonSerializable
 {
-    private $underlyingSymbol;
-    private $expirationDates;
-    private $strikes;
-    private $hasMiniOptions;
-    private $options;
+    private ?string $underlyingSymbol = null;
+    private ?array $expirationDates = null;
+    private ?array $strikes = null;
+    private ?bool $hasMiniOptions = null;
+    private ?array $options = null;
 
     public function __construct(array $values)
     {
@@ -26,34 +31,32 @@ class OptionChain implements \JsonSerializable
             'expirationDates' => $this->expirationDates,
             'strikes' => $this->strikes,
             'hasMiniOptions' => $this->hasMiniOptions,
-            'options' => array_map(function (Option $option): array {
-                return $option->jsonSerialize();
-            }, $this->options),
+            'options' => array_map(fn (Option $option): array => $option->jsonSerialize(), $this->options ?? []),
         ];
     }
 
-    public function getUnderlyingSymbol(): string
+    public function getUnderlyingSymbol(): ?string
     {
         return $this->underlyingSymbol;
     }
 
     public function getExpirationDates(): array
     {
-        return $this->expirationDates;
+        return $this->expirationDates ?? [];
     }
 
-    public function getStrikes(): array
+    public function getStrikes(): ?array
     {
         return $this->strikes;
     }
 
-    public function getHasMiniOptions(): bool
+    public function getHasMiniOptions(): ?bool
     {
         return $this->hasMiniOptions;
     }
 
     public function getOptions(): array
     {
-        return $this->options;
+        return $this->options ?? [];
     }
 }
