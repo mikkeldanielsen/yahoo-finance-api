@@ -57,11 +57,10 @@ class ApiClient {
 
     public function recommendationsBySymbol( string $symbol )
     {
-        $qs  = $this->getRandomQueryServer();
-        $url = 'https://query' . $qs . '.finance.yahoo.com/v6/finance/recommendationsbysymbol/' . urlencode( $symbol );
+        $url = 'https://query{queryServer}.finance.yahoo.com/v6/finance/recommendationsbysymbol/' . urlencode( $symbol );
 
-        $responseBody = (string)$this->client->request( 'GET', $url, [ 'headers' => $this->getHeaders() ] )->getBody();
-        return $this->resultDecoder->transformRecommendationBySymbol( $responseBody );
+        $response =$this->contextManager->request( 'GET', $url);
+        return $this->resultDecoder->transformRecommendationBySymbol( (string) $response->getBody() );
     }
 
     /**
