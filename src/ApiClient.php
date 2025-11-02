@@ -182,7 +182,7 @@ class ApiClient {
         $this->validateIntervals($interval);
         $this->validateDates($startDate, $endDate);
 
-        $responseBody = $this->getHistoricalDataResponseBodyJson($symbol, $interval, $startDate, $endDate, self::FILTER_HISTORICAL);
+        $responseBody = $this->getHistoricalDataResponse($symbol, $interval, $startDate, $endDate, self::FILTER_HISTORICAL);
 
         return $this->resultDecoder->transformChartResult($responseBody);
     }
