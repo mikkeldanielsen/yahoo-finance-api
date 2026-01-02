@@ -299,4 +299,23 @@ class ApiClientIntegrationTest extends TestCase
             }
         }
     }
+
+    #[Test]
+    public function news_withSearchTerm_returnNewsResults(): void
+    {
+        $returnValue = $this->client->news(self::APPLE_NAME);
+
+        $this->assertIsArray($returnValue);
+        $this->assertContainsOnlyInstancesOf(\Scheb\YahooFinanceApi\Results\NewsResult::class, $returnValue);
+
+        // Check that at least one result contains a title and link
+        $hasValidNews = false;
+        foreach ($returnValue as $result) {
+            if ($result->getTitle() && $result->getLink()) {
+                $hasValidNews = true;
+                break;
+            }
+        }
+        $this->assertTrue($hasValidNews, 'News result must contain at least one valid news item');
+    }
 }

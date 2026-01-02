@@ -16,6 +16,7 @@ use Scheb\YahooFinanceApi\Results\Quote;
 use Scheb\YahooFinanceApi\Results\Recommendation;
 use Scheb\YahooFinanceApi\Results\SearchResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
+use Scheb\YahooFinanceApi\Results\NewsResult;
 
 /**
  * @final
@@ -508,5 +509,36 @@ class ResultDecoder
         }
 
         return $encoded;
+    }
+
+    /**
+     * Decode search results and news items from Yahoo Finance API response.
+     *
+     * @return array Array with keys 'quotes' (SearchResult[]) and 'news' (NewsResult[])
+     */
+    public function transformSearchAndNewsResult(string $responseBody): array
+    {
+        $decoded = json_decode($responseBody, true);
+        $quotes = [];
+        $news = [];
+        if (isset($decoded['quotes']) && \is_array($decoded['quotes'])) {
+            $quotes = array_map(fn (array $item): SearchResult => $this->createSearchResultFromJson($item), $decoded['quotes']);
+        }
+        if (isset($decoded['news']) && \is_array($decoded['news'])) {
+            $news = array_map(fn (array $item): NewsResult => $this->createNewsResultFromJson($item), $decoded['news']);
+        }
+        return ['quotes' => $quotes, 'news' => $news];
+    }
+
+    private function createNewsResultFromJson(array $json): NewsResult
+    {
+        return new NewsResult(
+            $json['uuid'] ?? null,
+            $json['title'] ?? null,
+            $json['publisher'] ?? null,
+            $json['link'] ?? null,
+            $json['providerPublishTime'] ?? null,
+            $json['type'] ?? null
+        );
     }
 }

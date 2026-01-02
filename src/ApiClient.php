@@ -316,4 +316,27 @@ class ApiClient {
 
         return $this->resultDecoder->transformOptionChains((string) $response->getBody());
     }
+
+    /**
+     * Search for news related to a stock symbol or term.
+     *
+     * @param string $searchTerm The term or symbol to search news for.
+     * @param string $locale The locale for the search (default: 'en-US').
+     * @param int $limit The maximum number of results (default: 10).
+     * @return NewsResult[]
+     *
+     * @throws GuzzleException|ApiException
+     */
+    public function news(string $searchTerm, string $locale = 'en-US', int $limit = 10): array
+    {
+        $url = 'https://query{queryServer}.finance.yahoo.com/v1/finance/search?'
+            . 'q=' . urlencode($searchTerm)
+            . '&lang=' . urlencode($locale)
+            . '&region=US&quotesCount=' . $limit
+            . '&quotesQueryId=tss_match_phrase_query&multiQuoteQueryId=multi_quote_single_token_query&enableCb=false&enableNavLinks=true&enableCulturalAssets=true&enableNews=true&enableResearchReports=false&enableLists=false&listsCount=0&recommendCount=0&enablePrivateCompany=true';
+
+        $response = $this->contextManager->request('GET', $url);
+        $result = $this->resultDecoder->transformSearchAndNewsResult((string) $response->getBody());
+        return $result['news'];
+    }
 }
