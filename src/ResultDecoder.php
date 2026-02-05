@@ -537,8 +537,83 @@ class ResultDecoder
             $json['title'] ?? null,
             $json['publisher'] ?? null,
             $json['link'] ?? null,
-            $json['providerPublishTime'] ?? null,
-            $json['type'] ?? null
+            null,
+            $json['type'] ?? null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            []
+        );
+    }
+
+    public function transformNewsResult(string $responseBody): array
+    {
+        $decoded = json_decode($responseBody, true);
+
+        if (!isset($decoded['data']['tickerStream']['stream']) || !\is_array($decoded['data']['tickerStream']['stream'])) {
+            throw new ApiException('Yahoo News API returned an invalid response', ApiException::INVALID_RESPONSE);
+        }
+
+        $stream = $decoded['data']['tickerStream']['stream'];
+
+        // Filter out ads and map to NewsResult objects
+        return array_map(
+            fn (array $item): NewsResult => $this->createNewsResultFromStreamItem($item),
+            array_filter($stream, fn (array $item): bool => empty($item['ad']))
+        );
+    }
+
+    private function createNewsResultFromStreamItem(array $item): NewsResult
+    {
+        $content = $item['content'] ?? [];
+
+        // Extract stock tickers
+        $tickers = [];
+        if (isset($content['finance']['stockTickers']) && \is_array($content['finance']['stockTickers'])) {
+            $tickers = array_map(
+                fn (array $ticker): string => $ticker['symbol'] ?? '',
+                array_filter($content['finance']['stockTickers'], fn (array $t): bool => isset($t['symbol']))
+            );
+            // Remove empty strings
+            $tickers = array_values(array_filter($tickers));
+        }
+
+        // Parse publication date
+        $pubDate = null;
+        if (isset($content['pubDate'])) {
+            try {
+                $pubDate = new \DateTime($content['pubDate'], new \DateTimeZone('UTC'));
+            } catch (\Exception) {
+                // Keep null if parsing fails
+            }
+        }
+
+        // Get URL from canonicalUrl or clickThroughUrl
+        $link = $content['canonicalUrl']['url'] ?? $content['clickThroughUrl']['url'] ?? null;
+
+        // Get thumbnail URL
+        $thumbnail = null;
+        if (isset($content['thumbnail'])) {
+            $thumbnail = $content['thumbnail']['url']
+                ?? $content['thumbnail']['originalUrl']
+                ?? null;
+        }
+
+        return new NewsResult(
+            $item['id'] ?? null,
+            $content['title'] ?? null,
+            $content['provider']['displayName'] ?? null,
+            $link,
+            $pubDate,
+            $content['contentType'] ?? null,
+            $content['summary'] ?? null,
+            $content['description'] ?? null,
+            $thumbnail,
+            $content['finance']['premiumFinance']['isPremiumNews'] ?? false,
+            $content['metadata']['editorsPick'] ?? false,
+            $tickers
         );
     }
 }

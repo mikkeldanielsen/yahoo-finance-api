@@ -24,7 +24,7 @@ class ContextManager implements ContextManagerInterface
         $this->sessionContextStorage->invalidateSessionContext();
     }
 
-    public function request(string $method, string $url): ResponseInterface
+    public function request(string $method, string $url, array $options = []): ResponseInterface
     {
         $initialSessionContext = $sessionContext = $this->sessionContextStorage->getSessionContext();
 
@@ -41,6 +41,9 @@ class ContextManager implements ContextManagerInterface
             $url = str_replace('{crumb}', urlencode($sessionContext->crumb), $url);
             $requestOptions = ['cookies' => $sessionContext->cookies];
         }
+
+        // Merge with provided options (for POST body, etc.)
+        $requestOptions = array_merge($requestOptions, $options);
 
         $response = $sessionContext->httpClient->request($method, $url, $requestOptions);
 

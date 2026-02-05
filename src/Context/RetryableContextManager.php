@@ -23,11 +23,11 @@ class RetryableContextManager implements ContextManagerInterface
         $this->contextManager->renewSession();
     }
 
-    public function request(string $method, string $url): ResponseInterface
+    public function request(string $method, string $url, array $options = []): ResponseInterface
     {
         for ($try = 1; $try <= $this->maxTries; ++$try) {
             try {
-                return $this->contextManager->request($method, $url);
+                return $this->contextManager->request($method, $url, $options);
             } catch (\Exception $e) {
                 if ($try < $this->maxTries) {
                     // Restart session and give it another try when an API exception happened

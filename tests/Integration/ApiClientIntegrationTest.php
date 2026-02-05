@@ -301,14 +301,35 @@ class ApiClientIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function news_withSearchTerm_returnNewsResults(): void
+    public function news_withSymbol_returnNewsResults(): void
     {
-        $returnValue = $this->client->news(self::APPLE_NAME);
+        $returnValue = $this->client->news(self::APPLE_SYMBOL);
 
         $this->assertIsArray($returnValue);
         $this->assertContainsOnlyInstancesOf(\Scheb\YahooFinanceApi\Results\NewsResult::class, $returnValue);
 
-        // Check that at least one result contains a title and link
+        // Check that at least one result contains valid data
+        $hasValidNews = false;
+        foreach ($returnValue as $result) {
+            if ($result->getTitle() && $result->getLink()) {
+                $hasValidNews = true;
+                $this->assertInstanceOf(\DateTimeInterface::class, $result->getPubDate());
+                $this->assertIsArray($result->getStockTickers());
+                break;
+            }
+        }
+        $this->assertTrue($hasValidNews, 'News result must contain at least one valid news item');
+    }
+
+    #[Test]
+    public function news_withMultipleSymbols_returnNewsResults(): void
+    {
+        $returnValue = $this->client->news([self::APPLE_SYMBOL, self::GOOGLE_SYMBOL]);
+
+        $this->assertIsArray($returnValue);
+        $this->assertContainsOnlyInstancesOf(\Scheb\YahooFinanceApi\Results\NewsResult::class, $returnValue);
+
+        // Check that at least one result contains valid data
         $hasValidNews = false;
         foreach ($returnValue as $result) {
             if ($result->getTitle() && $result->getLink()) {
@@ -317,5 +338,14 @@ class ApiClientIntegrationTest extends TestCase
             }
         }
         $this->assertTrue($hasValidNews, 'News result must contain at least one valid news item');
+    }
+
+    #[Test]
+    public function news_withDifferentTab_returnNewsResults(): void
+    {
+        $returnValue = $this->client->news(self::APPLE_SYMBOL, ApiClient::NEWS_TAB_ALL);
+
+        $this->assertIsArray($returnValue);
+        $this->assertContainsOnlyInstancesOf(\Scheb\YahooFinanceApi\Results\NewsResult::class, $returnValue);
     }
 }

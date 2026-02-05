@@ -17,5 +17,5 @@ interface ContextManagerInterface
     /**
      * @throws GuzzleException
      */
-    public function request(string $method, string $url): ResponseInterface;
+    public function request(string $method, string $url, array $options = []): ResponseInterface;
 }
