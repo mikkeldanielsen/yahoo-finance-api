@@ -15,7 +15,9 @@ use Scheb\YahooFinanceApi\Results\OptionChain;
 use Scheb\YahooFinanceApi\Results\OptionContract;
 use Scheb\YahooFinanceApi\Results\Quote;
 use Scheb\YahooFinanceApi\Results\SearchResult;
+use Scheb\YahooFinanceApi\Results\ScreenerResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
+use Scheb\YahooFinanceApi\Screener\EquityQuery;
 use Scheb\YahooFinanceApi\Tests\TestCase;
 
 class ApiClientIntegrationTest extends TestCase
@@ -31,6 +33,32 @@ class ApiClientIntegrationTest extends TestCase
     protected function setUp(): void
     {
         $this->client = ApiClientFactory::createApiClient(retries: 1);
+    }
+
+    #[Test]
+    public function screen_denmarkByVolume_returnScreenerResult(): void
+    {
+        $query = new EquityQuery('and', [
+            new EquityQuery('eq', ['region', 'dk']),
+            new EquityQuery('gt', ['dayvolume', 0]),
+        ]);
+
+        $result = $this->client->screen($query, count: 5, sortField: 'dayvolume');
+
+        $this->assertInstanceOf(ScreenerResult::class, $result);
+        $this->assertLessThanOrEqual(5, $result->getCount());
+        $this->assertNotEmpty($result->getQuotes());
+        $this->assertArrayHasKey('symbol', $result->getQuotes()[0]);
+    }
+
+    #[Test]
+    public function screenPredefined_mostActives_returnScreenerResult(): void
+    {
+        $result = $this->client->screenPredefined('most_actives', 5);
+
+        $this->assertInstanceOf(ScreenerResult::class, $result);
+        $this->assertLessThanOrEqual(5, $result->getCount());
+        $this->assertNotEmpty($result->getQuotes());
     }
 
     #[Test]

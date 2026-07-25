@@ -54,6 +54,7 @@ composer update scheb/yahoo-finance-api
 ```php
 use Scheb\YahooFinanceApi\ApiClient;
 use Scheb\YahooFinanceApi\ApiClientFactory;
+use Scheb\YahooFinanceApi\Screener\EquityQuery;
 use GuzzleHttp\Client;
 
 // Create a new client from the factory
@@ -109,6 +110,19 @@ $quotes = $client->getQuotes(["AAPL", "GOOG"]);
 // Returns an array of Scheb\YahooFinanceApi\Results\OptionChain
 $optionChain = $client->getOptionChain("AAPL");
 $optionChain = $client->getOptionChain("AAPL", new \DateTime("2021-01-01"));
+
+// Screen Danish equities by region
+$denmark = $client->screen(new EquityQuery("eq", ["region", "dk"]));
+
+// Screen equities across the Nordic exchanges and sort by market cap
+$nordic = $client->screen(
+    new EquityQuery("is-in", ["exchange", "CPH", "STO", "HEL", "OSL", "ICE"]),
+    count: 100,
+    sortField: "intradaymarketcap"
+);
+
+// Run a Yahoo Finance predefined screen
+$gainers = $client->screenPredefined("day_gainers", 50);
 ```
 
 ## Configuration

@@ -56,6 +56,26 @@ class RetryableContextManagerTest extends TestCase
     }
 
     #[Test]
+    public function request_withOptions_forwardsOptionsOnEveryAttempt(): void
+    {
+        $expectedResponse = $this->createMock(ResponseInterface::class);
+        $options = ['json' => ['query' => ['operator' => 'EQ']]];
+
+        $this->mockContextManager
+            ->expects($this->exactly(2))
+            ->method('request')
+            ->with('POST', 'https://example.com', $options)
+            ->willReturnOnConsecutiveCalls(
+                $this->throwException(new \Exception('Network error')),
+                $expectedResponse
+            );
+
+        $result = $this->retryableContextManager->request('POST', 'https://example.com', $options);
+
+        $this->assertSame($expectedResponse, $result);
+    }
+
+    #[Test]
     public function request_failsFirstTryThenSucceeds_retriesAndReturnsResponse(): void
     {
         $expectedResponse = $this->createMock(ResponseInterface::class);

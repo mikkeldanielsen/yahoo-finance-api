@@ -75,6 +75,31 @@ class ContextManagerTest extends TestCase
     }
 
     #[Test]
+    public function request_withOptions_forwardsOptionsToHttpClient(): void
+    {
+        $method = 'POST';
+        $url = 'https://example.com/api/data?crumb={crumb}';
+        $expectedUrl = 'https://example.com/api/data?crumb='.self::CRUMB_VALUE;
+        $options = ['json' => ['query' => ['operator' => 'EQ']]];
+
+        $sessionContext = new SessionContext($this->mockHttpClient, self::QUERY_SERVER, $this->mockCookieJar, self::CRUMB_VALUE);
+        $this->sessionContextStorage
+            ->expects($this->once())
+            ->method('getSessionContext')
+            ->willReturn($sessionContext);
+
+        $this->mockHttpClient
+            ->expects($this->once())
+            ->method('request')
+            ->with($method, $expectedUrl, ['cookies' => $this->mockCookieJar] + $options)
+            ->willReturn($this->mockResponse);
+
+        $result = $this->contextManager->request($method, $url, $options);
+
+        $this->assertSame($this->mockResponse, $result);
+    }
+
+    #[Test]
     public function request_withQueryServerPlaceholder_replacesPlaceholderWithQueryServer(): void
     {
         $method = 'GET';

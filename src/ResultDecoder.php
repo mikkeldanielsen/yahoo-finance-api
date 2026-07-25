@@ -15,6 +15,7 @@ use Scheb\YahooFinanceApi\Results\OptionContract;
 use Scheb\YahooFinanceApi\Results\Quote;
 use Scheb\YahooFinanceApi\Results\Recommendation;
 use Scheb\YahooFinanceApi\Results\SearchResult;
+use Scheb\YahooFinanceApi\Results\ScreenerResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
 use Scheb\YahooFinanceApi\Results\NewsResult;
 
@@ -146,6 +147,33 @@ class ResultDecoder
         }
 
         return array_map(fn (array $item): SearchResult => $this->createSearchResultFromJson($item), $decoded['quotes']);
+    }
+
+    public function transformScreenerResult(string $responseBody): ScreenerResult
+    {
+        $decoded = json_decode($responseBody, true);
+        $result = $decoded['finance']['result'][0] ?? null;
+        if (!\is_array($result)
+            || !isset($result['start'], $result['count'], $result['total'], $result['quotes'])
+            || !\is_int($result['start'])
+            || !\is_int($result['count'])
+            || !\is_int($result['total'])
+            || !\is_array($result['quotes'])) {
+            throw new ApiException('Yahoo Screener API returned an invalid response', ApiException::INVALID_RESPONSE);
+        }
+
+        $result['quotes'] = array_values(array_filter($result['quotes'], '\\is_array'));
+        $metadata = $result;
+        unset($metadata['start'], $metadata['count'], $metadata['total'], $metadata['quotes']);
+
+        return new ScreenerResult(
+            $result['start'],
+            $result['count'],
+            $result['total'],
+            $result['quotes'],
+            $metadata,
+            $result
+        );
     }
 
     private function createSearchResultFromJson(array $json): SearchResult

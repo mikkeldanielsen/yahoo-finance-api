@@ -10,8 +10,10 @@ use Scheb\YahooFinanceApi\Exception\ApiException;
 use Scheb\YahooFinanceApi\Results\DividendData;
 use Scheb\YahooFinanceApi\Results\HistoricalData;
 use Scheb\YahooFinanceApi\Results\Quote;
+use Scheb\YahooFinanceApi\Results\ScreenerResult;
 use Scheb\YahooFinanceApi\Results\SearchResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
+use Scheb\YahooFinanceApi\Screener\EquityQuery;
 
 /**
  * @final
@@ -62,6 +64,60 @@ class ApiClient {
         $response = $this->contextManager->request('GET', $url);
 
         return $this->resultDecoder->transformSearchResult((string) $response->getBody());
+    }
+
+    /**
+     * Run a custom equity screen.
+     *
+     * @throws GuzzleException|ApiException|\InvalidArgumentException
+     */
+    public function screen(
+        EquityQuery $query,
+        int $offset = 0,
+        int $count = 25,
+        string $sortField = 'ticker',
+        bool $sortAscending = false,
+    ): ScreenerResult {
+        $this->validateScreenerPagination($offset, $count);
+        if ('ticker' !== $sortField && !EquityQuery::isValidField($sortField)) {
+            throw new \InvalidArgumentException(\sprintf('Invalid equity screener sort field "%s".', $sortField));
+        }
+
+        $url = 'https://query{queryServer}.finance.yahoo.com/v1/finance/screener'
+            .'?crumb={crumb}&formatted=false&lang=en-US&region=US';
+        $response = $this->contextManager->request('POST', $url, [
+            'json' => [
+                'offset' => $offset,
+                'count' => $count,
+                'sortField' => $sortField,
+                'sortType' => $sortAscending ? 'ASC' : 'DESC',
+                'userId' => '',
+                'userIdType' => 'guid',
+                'query' => $query->toArray(),
+                'quoteType' => 'EQUITY',
+            ],
+        ]);
+
+        return $this->resultDecoder->transformScreenerResult((string) $response->getBody());
+    }
+
+    /**
+     * Run one of Yahoo Finance's predefined screens.
+     *
+     * @throws GuzzleException|ApiException|\InvalidArgumentException
+     */
+    public function screenPredefined(string $screenId, int $count = 25): ScreenerResult
+    {
+        if ('' === trim($screenId)) {
+            throw new \InvalidArgumentException('Predefined screen ID must not be empty.');
+        }
+        $this->validateScreenerPagination(0, $count);
+
+        $url = 'https://query{queryServer}.finance.yahoo.com/v1/finance/screener/predefined/saved'
+            .'?crumb={crumb}&formatted=false&lang=en-US&region=US&scrIds='.urlencode($screenId).'&count='.$count;
+        $response = $this->contextManager->request('GET', $url);
+
+        return $this->resultDecoder->transformScreenerResult((string) $response->getBody());
     }
 
     public function recommendationsBySymbol( string $symbol )
@@ -275,6 +331,16 @@ class ApiClient {
     {
         if ($startDate > $endDate) {
             throw new \InvalidArgumentException('Start date must be before end date');
+        }
+    }
+
+    private function validateScreenerPagination(int $offset, int $count): void
+    {
+        if ($offset < 0) {
+            throw new \InvalidArgumentException('Screener offset must be greater than or equal to 0.');
+        }
+        if ($count < 1 || $count > 250) {
+            throw new \InvalidArgumentException('Screener count must be between 1 and 250.');
         }
     }
 

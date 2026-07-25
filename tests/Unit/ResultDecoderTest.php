@@ -13,6 +13,7 @@ use Scheb\YahooFinanceApi\Results\HistoricalData;
 use Scheb\YahooFinanceApi\Results\OptionChain;
 use Scheb\YahooFinanceApi\Results\Quote;
 use Scheb\YahooFinanceApi\Results\SearchResult;
+use Scheb\YahooFinanceApi\Results\ScreenerResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
 use Scheb\YahooFinanceApi\Tests\TestCase;
 use Scheb\YahooFinanceApi\ValueMapper;
@@ -72,6 +73,30 @@ class ResultDecoderTest extends TestCase
             'Equity'
         );
         $this->assertEquals($expectedItem, $returnedResult[0]);
+    }
+
+    #[Test]
+    public function transformScreenerResult_fixtureGiven_preservesResultAndMetadata(): void
+    {
+        $returnedResult = $this->resultDecoder->transformScreenerResult($this->loadFixtureFile('screenerResult.json'));
+
+        $this->assertInstanceOf(ScreenerResult::class, $returnedResult);
+        $this->assertSame(10, $returnedResult->getStart());
+        $this->assertSame(2, $returnedResult->getCount());
+        $this->assertSame(87, $returnedResult->getTotal());
+        $this->assertSame('preserved', $returnedResult->getQuotes()[0]['customField']);
+        $this->assertSame('day_gainers', $returnedResult->getMetadata()['id']);
+        $this->assertSame('percentchange', $returnedResult->getMetadata()['criteriaMeta']['sortField']);
+        $this->assertSame($returnedResult->getRawResult(), $returnedResult->jsonSerialize()['rawResult']);
+    }
+
+    #[Test]
+    public function transformScreenerResult_invalidResponse_throwsException(): void
+    {
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('Yahoo Screener API returned an invalid response');
+
+        $this->resultDecoder->transformScreenerResult('{"finance":{"result":[]}}');
     }
 
     #[Test]

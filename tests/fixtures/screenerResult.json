@@ -1,0 +1,33 @@
+{
+    "finance": {
+        "result": [
+            {
+                "id": "day_gainers",
+                "title": "Day Gainers",
+                "criteriaMeta": {
+                    "size": 2,
+                    "offset": 10,
+                    "sortField": "percentchange",
+                    "sortType": "DESC",
+                    "quoteType": "EQUITY"
+                },
+                "start": 10,
+                "count": 2,
+                "total": 87,
+                "quotes": [
+                    {
+                        "symbol": "AAA",
+                        "regularMarketPrice": 42.5,
+                        "customField": "preserved"
+                    },
+                    {
+                        "symbol": "BBB",
+                        "regularMarketPrice": 17.25
+                    }
+                ],
+                "useRecords": false
+            }
+        ],
+        "error": null
+    }
+}
