@@ -1,0 +1,31 @@
+{
+  "data": {
+    "name": "Drug Manufacturers - General",
+    "symbol": "^YH20620010",
+    "sectorKey": "healthcare",
+    "sectorName": "Healthcare",
+    "overview": {
+      "companiesCount": 11
+    },
+    "topCompanies": [
+      {
+        "symbol": "LLY",
+        "name": "Eli Lilly and Company",
+        "rating": "Buy",
+        "marketWeight": {"raw": 0.3364609}
+      },
+      {
+        "symbol": "JNJ",
+        "name": "Johnson & Johnson",
+        "rating": "Buy",
+        "marketWeight": {"raw": 0.19710697}
+      }
+    ],
+    "topPerformingCompanies": [
+      {"symbol": "LLY", "ytdReturn": {"raw": 0.12}}
+    ],
+    "topGrowthCompanies": [
+      {"symbol": "LLY", "growthEstimate": {"raw": 0.15}}
+    ]
+  }
+}

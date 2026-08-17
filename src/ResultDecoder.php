@@ -8,16 +8,20 @@ use Scheb\YahooFinanceApi\Exception\ApiException;
 use Scheb\YahooFinanceApi\Exception\InvalidValueException;
 use Scheb\YahooFinanceApi\Results\Chart;
 use Scheb\YahooFinanceApi\Results\DividendData;
+use Scheb\YahooFinanceApi\Results\DomainCompany;
 use Scheb\YahooFinanceApi\Results\HistoricalData;
+use Scheb\YahooFinanceApi\Results\IndustryResult;
+use Scheb\YahooFinanceApi\Results\NewsResult;
 use Scheb\YahooFinanceApi\Results\Option;
 use Scheb\YahooFinanceApi\Results\OptionChain;
 use Scheb\YahooFinanceApi\Results\OptionContract;
 use Scheb\YahooFinanceApi\Results\Quote;
 use Scheb\YahooFinanceApi\Results\Recommendation;
-use Scheb\YahooFinanceApi\Results\SearchResult;
 use Scheb\YahooFinanceApi\Results\ScreenerResult;
+use Scheb\YahooFinanceApi\Results\SearchResult;
+use Scheb\YahooFinanceApi\Results\SectorIndustry;
+use Scheb\YahooFinanceApi\Results\SectorResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
-use Scheb\YahooFinanceApi\Results\NewsResult;
 
 /**
  * @final
@@ -174,6 +178,106 @@ class ResultDecoder
             $metadata,
             $result
         );
+    }
+
+    public function transformSectorResult(string $responseBody, string $key): SectorResult
+    {
+        $data = $this->decodeDomainData($responseBody, 'Sector');
+        $industries = [];
+        foreach ($data['industries'] ?? [] as $industry) {
+            if (!\is_array($industry) || !\is_string($industry['key'] ?? null) || !\is_string($industry['name'] ?? null)) {
+                continue;
+            }
+
+            $industries[] = new SectorIndustry(
+                $industry['key'],
+                $industry['name'],
+                \is_string($industry['symbol'] ?? null) ? $industry['symbol'] : null,
+                $this->rawFloat($industry['marketWeight'] ?? null),
+                $industry
+            );
+        }
+
+        return new SectorResult(
+            $key,
+            $this->requiredDomainName($data, 'Sector'),
+            \is_string($data['symbol'] ?? null) ? $data['symbol'] : null,
+            \is_array($data['overview'] ?? null) ? $data['overview'] : [],
+            $industries,
+            $this->createDomainCompanies($data['topCompanies'] ?? []),
+            $data
+        );
+    }
+
+    public function transformIndustryResult(string $responseBody, string $key): IndustryResult
+    {
+        $data = $this->decodeDomainData($responseBody, 'Industry');
+
+        return new IndustryResult(
+            $key,
+            $this->requiredDomainName($data, 'Industry'),
+            \is_string($data['symbol'] ?? null) ? $data['symbol'] : null,
+            \is_string($data['sectorKey'] ?? null) ? $data['sectorKey'] : null,
+            \is_string($data['sectorName'] ?? null) ? $data['sectorName'] : null,
+            \is_array($data['overview'] ?? null) ? $data['overview'] : [],
+            $this->createDomainCompanies($data['topCompanies'] ?? []),
+            \is_array($data['topPerformingCompanies'] ?? null) ? $data['topPerformingCompanies'] : [],
+            \is_array($data['topGrowthCompanies'] ?? null) ? $data['topGrowthCompanies'] : [],
+            $data
+        );
+    }
+
+    private function decodeDomainData(string $responseBody, string $domain): array
+    {
+        $decoded = json_decode($responseBody, true);
+        if (!\is_array($decoded['data'] ?? null)) {
+            throw new ApiException(\sprintf('Yahoo %s API returned an invalid response', $domain), ApiException::INVALID_RESPONSE);
+        }
+
+        return $decoded['data'];
+    }
+
+    private function requiredDomainName(array $data, string $domain): string
+    {
+        if (!\is_string($data['name'] ?? null) || '' === trim($data['name'])) {
+            throw new ApiException(\sprintf('Yahoo %s API response is missing a name', $domain), ApiException::INVALID_RESPONSE);
+        }
+
+        return $data['name'];
+    }
+
+    /** @return DomainCompany[] */
+    private function createDomainCompanies(mixed $companies): array
+    {
+        if (!\is_array($companies)) {
+            return [];
+        }
+
+        $results = [];
+        foreach ($companies as $company) {
+            if (!\is_array($company) || !\is_string($company['symbol'] ?? null)) {
+                continue;
+            }
+
+            $results[] = new DomainCompany(
+                $company['symbol'],
+                \is_string($company['name'] ?? null) ? $company['name'] : null,
+                \is_string($company['rating'] ?? null) ? $company['rating'] : null,
+                $this->rawFloat($company['marketWeight'] ?? null),
+                $company
+            );
+        }
+
+        return $results;
+    }
+
+    private function rawFloat(mixed $value): ?float
+    {
+        if (\is_array($value)) {
+            $value = $value['raw'] ?? null;
+        }
+
+        return is_numeric($value) ? (float) $value : null;
     }
 
     private function createSearchResultFromJson(array $json): SearchResult

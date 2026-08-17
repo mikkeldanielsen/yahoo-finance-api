@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Scheb\YahooFinanceApi\Tests\Unit\Context;
 
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Http\Message\ResponseInterface;
@@ -153,5 +156,59 @@ class RetryableContextManagerTest extends TestCase
         // Verify that some delay was applied (allowing for some tolerance)
         $executionTime = ($endTime - $startTime) * 1000000; // Convert to microseconds
         $this->assertGreaterThan(500, $executionTime); // At least 500ms should have passed
+    }
+
+    #[Test]
+    public function request_rateLimited_renewsSessionAndRetries(): void
+    {
+        $exception = new ClientException(
+            'Rate limited',
+            new Request('GET', 'https://example.com'),
+            new Response(429, ['Retry-After' => '0'])
+        );
+        $response = $this->createMock(ResponseInterface::class);
+        $this->mockContextManager
+            ->expects($this->exactly(2))
+            ->method('request')
+            ->willReturnOnConsecutiveCalls($this->throwException($exception), $response);
+        $this->mockContextManager->expects($this->once())->method('renewSession');
+
+        $this->assertSame($response, $this->retryableContextManager->request('GET', 'https://example.com'));
+    }
+
+    #[Test]
+    public function request_unauthorized_renewsSessionAndRetries(): void
+    {
+        $exception = new ClientException(
+            'Unauthorized',
+            new Request('GET', 'https://example.com'),
+            new Response(401)
+        );
+        $response = $this->createMock(ResponseInterface::class);
+        $this->mockContextManager
+            ->expects($this->exactly(2))
+            ->method('request')
+            ->willReturnOnConsecutiveCalls($this->throwException($exception), $response);
+        $this->mockContextManager->expects($this->once())->method('renewSession');
+
+        $this->assertSame($response, $this->retryableContextManager->request('GET', 'https://example.com'));
+    }
+
+    #[Test]
+    public function request_permanentClientError_doesNotRetry(): void
+    {
+        $exception = new ClientException(
+            'Not found',
+            new Request('GET', 'https://example.com'),
+            new Response(404)
+        );
+        $this->mockContextManager
+            ->expects($this->once())
+            ->method('request')
+            ->willThrowException($exception);
+        $this->mockContextManager->expects($this->never())->method('renewSession');
+
+        $this->expectException(ClientException::class);
+        $this->retryableContextManager->request('GET', 'https://example.com');
     }
 }

@@ -10,12 +10,14 @@ use Scheb\YahooFinanceApi\ApiClient;
 use Scheb\YahooFinanceApi\ApiClientFactory;
 use Scheb\YahooFinanceApi\Results\DividendData;
 use Scheb\YahooFinanceApi\Results\HistoricalData;
+use Scheb\YahooFinanceApi\Results\IndustryResult;
 use Scheb\YahooFinanceApi\Results\Option;
 use Scheb\YahooFinanceApi\Results\OptionChain;
 use Scheb\YahooFinanceApi\Results\OptionContract;
 use Scheb\YahooFinanceApi\Results\Quote;
-use Scheb\YahooFinanceApi\Results\SearchResult;
 use Scheb\YahooFinanceApi\Results\ScreenerResult;
+use Scheb\YahooFinanceApi\Results\SearchResult;
+use Scheb\YahooFinanceApi\Results\SectorResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
 use Scheb\YahooFinanceApi\Screener\EquityQuery;
 use Scheb\YahooFinanceApi\Tests\TestCase;
@@ -33,6 +35,26 @@ class ApiClientIntegrationTest extends TestCase
     protected function setUp(): void
     {
         $this->client = ApiClientFactory::createApiClient(retries: 1);
+    }
+
+    #[Test]
+    public function getSector_healthcare_returnsIndustries(): void
+    {
+        $result = $this->client->getSector('healthcare');
+
+        $this->assertInstanceOf(SectorResult::class, $result);
+        $this->assertSame('Healthcare', $result->getName());
+        $this->assertNotEmpty($result->getIndustries());
+    }
+
+    #[Test]
+    public function getIndustry_drugManufacturers_returnsTopCompanies(): void
+    {
+        $result = $this->client->getIndustry('drug-manufacturers-general');
+
+        $this->assertInstanceOf(IndustryResult::class, $result);
+        $this->assertSame('healthcare', $result->getSectorKey());
+        $this->assertNotEmpty($result->getTopCompanies());
     }
 
     #[Test]

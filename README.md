@@ -111,6 +111,18 @@ $quotes = $client->getQuotes(["AAPL", "GOOG"]);
 $optionChain = $client->getOptionChain("AAPL");
 $optionChain = $client->getOptionChain("AAPL", new \DateTime("2021-01-01"));
 
+// Returns Scheb\YahooFinanceApi\Results\SectorResult
+$healthcare = $client->getSector("healthcare");
+foreach ($healthcare->getIndustries() as $industry) {
+    echo $industry->getKey().": ".$industry->getName();
+}
+
+// Returns Scheb\YahooFinanceApi\Results\IndustryResult
+$drugManufacturers = $client->getIndustry("drug-manufacturers-general", "DK");
+foreach ($drugManufacturers->getTopCompanies() as $company) {
+    echo $company->getSymbol().": ".$company->getName();
+}
+
 // Screen Danish equities by region
 $denmark = $client->screen(new EquityQuery("eq", ["region", "dk"]));
 
@@ -175,12 +187,9 @@ $client = ApiClientFactory::createApiClient(
 );
 ```
 
-When a request fails, the library will:
-
-1. Wait for the specified delay
-2. Renew the session context (fetch new set of cookies and crumb value)
-3. Retry the request
-4. Repeat until success or max retries reached
+The library retries network failures, HTTP 401, 403, 408, 425, 429, and server errors. It does not retry permanent client
+errors such as HTTP 400 or 404. The configured fixed delay is applied before each retry. Every retry invalidates the
+current session so that fresh cookies and a new crumb are acquired for the next attempt.
 
 ### Context Cache Feature
 

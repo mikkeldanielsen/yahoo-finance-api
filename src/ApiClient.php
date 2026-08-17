@@ -9,8 +9,10 @@ use Scheb\YahooFinanceApi\Context\ContextManagerInterface;
 use Scheb\YahooFinanceApi\Exception\ApiException;
 use Scheb\YahooFinanceApi\Results\DividendData;
 use Scheb\YahooFinanceApi\Results\HistoricalData;
+use Scheb\YahooFinanceApi\Results\IndustryResult;
 use Scheb\YahooFinanceApi\Results\Quote;
 use Scheb\YahooFinanceApi\Results\ScreenerResult;
+use Scheb\YahooFinanceApi\Results\SectorResult;
 use Scheb\YahooFinanceApi\Results\SearchResult;
 use Scheb\YahooFinanceApi\Results\SplitData;
 use Scheb\YahooFinanceApi\Screener\EquityQuery;
@@ -67,6 +69,38 @@ class ApiClient {
     }
 
     /**
+     * Get sector metadata, industries, and top companies.
+     *
+     * @throws GuzzleException|ApiException|\InvalidArgumentException
+     */
+    public function getSector(string $key, string $region = 'US'): SectorResult
+    {
+        $key = $this->validateDomainKey($key);
+        $region = $this->validateRegion($region);
+        $url = 'https://query{queryServer}.finance.yahoo.com/v1/finance/sectors/'.rawurlencode($key)
+            .'?crumb={crumb}&formatted=false&withReturns=true&lang=en-US&region='.urlencode($region);
+        $response = $this->contextManager->request('GET', $url);
+
+        return $this->resultDecoder->transformSectorResult((string) $response->getBody(), $key);
+    }
+
+    /**
+     * Get industry metadata and top companies for a region.
+     *
+     * @throws GuzzleException|ApiException|\InvalidArgumentException
+     */
+    public function getIndustry(string $key, string $region = 'US'): IndustryResult
+    {
+        $key = $this->validateDomainKey($key);
+        $region = $this->validateRegion($region);
+        $url = 'https://query{queryServer}.finance.yahoo.com/v1/finance/industries/'.rawurlencode($key)
+            .'?crumb={crumb}&formatted=false&withReturns=true&lang=en-US&region='.urlencode($region);
+        $response = $this->contextManager->request('GET', $url);
+
+        return $this->resultDecoder->transformIndustryResult((string) $response->getBody(), $key);
+    }
+
+    /**
      * Run a custom equity screen.
      *
      * @throws GuzzleException|ApiException|\InvalidArgumentException
@@ -85,17 +119,19 @@ class ApiClient {
 
         $url = 'https://query{queryServer}.finance.yahoo.com/v1/finance/screener'
             .'?crumb={crumb}&formatted=false&lang=en-US&region=US';
+        $payload = [
+            'offset' => $offset,
+            'count' => $count,
+            'sortField' => $sortField,
+            'sortType' => $sortAscending ? 'ASC' : 'DESC',
+            'userId' => '',
+            'userIdType' => 'guid',
+            'query' => $query->toArray(),
+            'quoteType' => 'EQUITY',
+        ];
         $response = $this->contextManager->request('POST', $url, [
-            'json' => [
-                'offset' => $offset,
-                'count' => $count,
-                'sortField' => $sortField,
-                'sortType' => $sortAscending ? 'ASC' : 'DESC',
-                'userId' => '',
-                'userIdType' => 'guid',
-                'query' => $query->toArray(),
-                'quoteType' => 'EQUITY',
-            ],
+            'body' => json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+            'headers' => ['Content-Type' => 'application/json'],
         ]);
 
         return $this->resultDecoder->transformScreenerResult((string) $response->getBody());
@@ -342,6 +378,26 @@ class ApiClient {
         if ($count < 1 || $count > 250) {
             throw new \InvalidArgumentException('Screener count must be between 1 and 250.');
         }
+    }
+
+    private function validateDomainKey(string $key): string
+    {
+        $key = trim($key);
+        if ('' === $key || 1 !== preg_match('/^[a-z0-9&-]+$/', $key)) {
+            throw new \InvalidArgumentException('Domain key must contain only lowercase letters, numbers, ampersands, and hyphens.');
+        }
+
+        return $key;
+    }
+
+    private function validateRegion(string $region): string
+    {
+        $region = strtoupper(trim($region));
+        if (1 !== preg_match('/^[A-Z]{2}$/', $region)) {
+            throw new \InvalidArgumentException('Region must be a two-letter country code.');
+        }
+
+        return $region;
     }
 
     /**

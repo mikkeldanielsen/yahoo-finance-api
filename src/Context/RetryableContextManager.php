@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Scheb\YahooFinanceApi\Context;
 
+use GuzzleHttp\Exception\RequestException;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -29,18 +30,36 @@ class RetryableContextManager implements ContextManagerInterface
             try {
                 return $this->contextManager->request($method, $url, $options);
             } catch (\Exception $e) {
-                if ($try < $this->maxTries) {
-                    // Restart session and give it another try when an API exception happened
-                    if ($this->retryDelay) {
-                        usleep($this->retryDelay * 1000);
-                    }
-                    $this->renewSession();
+                if ($try >= $this->maxTries || !$this->isRetryable($e)) {
+                    throw $e;
                 }
+
+                if ($this->retryDelay > 0) {
+                    usleep($this->retryDelay * 1000);
+                }
+
+                $this->renewSession();
             }
         }
 
         // Final try, throw last exception
         /** @psalm-suppress PossiblyUndefinedVariable */
         throw $e;
+    }
+
+    private function isRetryable(\Exception $exception): bool
+    {
+        if (!$exception instanceof RequestException) {
+            return true;
+        }
+
+        $response = $exception->getResponse();
+        if (null === $response) {
+            return true;
+        }
+
+        $statusCode = $response->getStatusCode();
+
+        return \in_array($statusCode, [401, 403, 408, 425, 429], true) || $statusCode >= 500;
     }
 }
